@@ -9,7 +9,8 @@ from attendpy.config import AppConfig
 from attendpy.db import Database
 from attendpy.models import LessonEvent, LessonStatus, LessonType
 from attendpy.providers import get_provider
-from attendpy.ui.rich_compat import Panel, Prompt, Table, box, console
+from attendpy.ui.interactive import interactive_lessons_selector
+from attendpy.ui.rich_compat import Panel, Table, box, console
 
 
 def render_lessons_table(
@@ -52,11 +53,11 @@ def render_lessons_table(
     for ev in sorted(filtered, key=lambda x: x.start_time):
         t_style = "bold magenta" if ev.lesson_type == LessonType.LAB else "bold cyan"
         if ev.status == LessonStatus.ATTENDED:
-            s_badge = "[bold green]✔ ATTENDED[/]"
+            s_badge = "[bold green]ATTENDED[/]"
         elif ev.status == LessonStatus.SKIPPED:
-            s_badge = "[bold yellow]✘ SKIPPED[/]"
+            s_badge = "[bold yellow]SKIPPED[/]"
         else:
-            s_badge = "[dim]⏳ UPCOMING[/]"
+            s_badge = "[dim]UPCOMING[/]"
 
         loc_info = ev.location or ""
         if ev.external_code:
@@ -139,50 +140,47 @@ def restore_lesson_by_id(
     )
 
 
+def toggle_lesson_event_status(
+    db: Database,
+    config: AppConfig,
+    ev: LessonEvent,
+) -> tuple[bool, str]:
+    """Toggle a lesson event between ATTENDED and SKIPPED in-place and in DB/Calendar."""
+    if ev.status == LessonStatus.SKIPPED:
+        ok, msg = restore_lesson_by_id(db, config, ev.short_id)
+        if ok:
+            ev.status = LessonStatus.ATTENDED
+            ev.calendar_name = config.attended_calendar
+            ev.is_newly_completed = False
+        return ok, msg
+    else:
+        ok, msg = skip_lesson_by_id(db, config, ev.short_id)
+        if ok:
+            ev.status = LessonStatus.SKIPPED
+            ev.calendar_name = config.skipped_calendar
+            ev.is_newly_completed = False
+        return ok, msg
+
+
 def interactive_skip_or_restore_prompt(
     db: Database,
     config: AppConfig,
     lessons: list[LessonEvent],
     only_new: bool = False,
+    initial_course_filter: Optional[str] = None,
 ) -> None:
-    """Interactive TUI prompt to skip (cancel) or restore one or more lessons."""
-    target_list = (
-        [e for e in lessons if e.is_newly_completed] if only_new else lessons
+    """Launch the arrow-key interactive lesson selector and status toggler."""
+    title = (
+        "Review Newly Completed Lessons (↑/↓ & Space/Enter to Toggle)"
+        if only_new
+        else "Interactive Lessons Browser & Status Editor (↑/↓ & Space/Enter)"
     )
-    if not target_list:
-        console.print("[yellow]No lessons available for this view.[/]")
-        return
-
-    render_lessons_table(
-        target_list,
-        title="Newly Completed Lessons" if only_new else "All Lessons",
+    interactive_lessons_selector(
+        db=db,
+        config=config,
+        lessons=lessons,
+        toggle_callback=toggle_lesson_event_status,
+        title=title,
+        only_new=only_new,
+        initial_course_filter=initial_course_filter,
     )
-
-    console.print(
-        "\n[bold]Actions:[/]\n"
-        "  • Enter one or more [bold cyan]Lesson IDs[/] separated by spaces/commas to toggle status\n"
-        "    (Attended → moved to [bold yellow]Skipped Calendar[/]; Skipped → restored to [bold green]Attended Calendar[/])\n"
-        "  • Press [bold]Enter[/] to return to the main menu."
-    )
-    raw_input = Prompt.ask("[bold cyan]Lesson ID(s)[/]", default="").strip()
-    if not raw_input:
-        return
-
-    ids = [
-        token.strip()
-        for token in raw_input.replace(",", " ").split()
-        if token.strip()
-    ]
-    by_short = {e.short_id.lower(): e for e in lessons}
-
-    for lid in ids:
-        ev = by_short.get(lid.lower())
-        if ev and ev.status == LessonStatus.SKIPPED:
-            ok, msg = restore_lesson_by_id(db, config, lid)
-        else:
-            ok, msg = skip_lesson_by_id(db, config, lid)
-
-        style = "bold green" if ok else "bold red"
-        console.print(f"[{style}]{msg}[/]")
-        if ok and ev:
-            ev.is_newly_completed = False

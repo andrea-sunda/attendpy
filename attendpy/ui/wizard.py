@@ -9,6 +9,7 @@ from attendpy.config import AppConfig
 from attendpy.db import Database
 from attendpy.models import CourseConfig, LessonEvent, LessonType
 from attendpy.providers import get_provider
+from attendpy.ui.interactive import select_from_list
 from attendpy.ui.rich_compat import (
     Confirm,
     FloatPrompt,
@@ -46,16 +47,14 @@ def run_initial_setup_wizard(config: AppConfig) -> AppConfig:
     # Step 1: Select Calendar Provider
     # ------------------------------------------------------------------
     console.print(Rule("[bold cyan]Step 1 of 3 — Select Calendar Provider[/]"))
-    console.print(
-        "Choose how [bold]attendpy[/] should connect to your calendars:\n"
-        "  • [bold]apple[/]  : Native macOS Apple Calendar (also reads Google accounts synced to macOS Calendar)\n"
-        "  • [bold]google[/] : Direct Google Calendar connection via iCal (.ics) feeds or OAuth token\n"
-        "  • [bold]hybrid[/] : Combine both Apple Calendar and direct Google Calendar feeds\n"
-    )
-    provider_choice = Prompt.ask(
-        "[bold]Select calendar provider[/]",
-        choices=["apple", "google", "hybrid"],
-        default=config.provider or "apple",
+    provider_choice = select_from_list(
+        title="Select Calendar Provider",
+        options=[
+            ("apple", "Native macOS Apple Calendar / iCloud (also reads Google accounts synced to Mac)"),
+            ("google", "Direct Google Calendar connection via iCal (.ics) feeds or OAuth token"),
+            ("hybrid", "Combine both Apple Calendar and direct Google Calendar feeds"),
+        ],
+        default_value=config.provider or "apple",
     )
     config.provider = provider_choice.strip().lower()
 
@@ -86,10 +85,10 @@ def run_initial_setup_wizard(config: AppConfig) -> AppConfig:
             src_list_str = ", ".join(f"[bold cyan]{s}[/]" for s in cloud_sources)
             console.print(f"Detected Cloud account(s): {src_list_str}")
             if len(cloud_sources) > 1:
-                config.cloud_account = Prompt.ask(
-                    "[bold]Select Cloud account for calendars[/]",
-                    choices=cloud_sources,
-                    default=cloud_sources[0],
+                config.cloud_account = select_from_list(
+                    title="Select Cloud Account for Calendars",
+                    options=[(s, f"{s} Cloud Account") for s in cloud_sources],
+                    default_value=cloud_sources[0],
                 )
             else:
                 config.cloud_account = cloud_sources[0]
@@ -159,12 +158,12 @@ def run_initial_setup_wizard(config: AppConfig) -> AppConfig:
     verify_table.add_row(
         "Attended Lessons",
         config.attended_calendar,
-        f"[green]✔ {msg_att}[/]" if ok_att else f"[red]✘ {msg_att}[/]",
+        f"[green][OK] {msg_att}[/]" if ok_att else f"[red][ERR] {msg_att}[/]",
     )
     verify_table.add_row(
         "Skipped Lessons",
         config.skipped_calendar,
-        f"[green]✔ {msg_skp}[/]" if ok_skp else f"[red]✘ {msg_skp}[/]",
+        f"[green][OK] {msg_skp}[/]" if ok_skp else f"[red][ERR] {msg_skp}[/]",
     )
     console.print(verify_table)
 
@@ -172,7 +171,7 @@ def run_initial_setup_wizard(config: AppConfig) -> AppConfig:
     config.last_sync_at = datetime.now().isoformat(timespec="seconds")
     saved_path = config.save()
     console.print(
-        f"[bold green]✔ Configuration saved to[/] [underline]{saved_path}[/]\n"
+        f"[bold green]Configuration saved to[/] [underline]{saved_path}[/]\n"
     )
     return config
 
@@ -218,7 +217,7 @@ def discover_and_prompt_new_courses(
 
         # Compact single-line header for new course discovery
         console.print(
-            f"\n[bold yellow]✨ New course:[/] [bold bright_white]{course_name}[/] "
+            f"\n[bold yellow]New course:[/] [bold bright_white]{course_name}[/] "
             f"[dim]({len(theory_evs)} Theory, {len(lab_evs)} Lab in calendar)[/]"
         )
 
@@ -278,6 +277,6 @@ def discover_and_prompt_new_courses(
         )
         db.upsert_course(new_course)
         newly_configured.append(new_course)
-        console.print(f"  [bold green]✔ Saved '{course_name}'.[/]")
+        console.print(f"  [bold green]Saved '{course_name}'.[/]")
 
     return newly_configured

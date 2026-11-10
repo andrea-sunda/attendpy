@@ -139,17 +139,17 @@ def _render_component_plot(
                 grid_char[y2][c] = "─"
                 grid_style[y2][c] = line_color
 
-    # 5. Plot the discrete lesson markers (● for Attended, ✖ for Skipped)
+    # 5. Plot the discrete lesson markers (O for Attended, X for Skipped)
     for i, pt in enumerate(display_pts):
         x, y = xs[i], ys[i]
         if x >= width:
             continue
         status = pt[3]
         if status == LessonStatus.ATTENDED:
-            grid_char[y][x] = "●"
+            grid_char[y][x] = "O"
             grid_style[y][x] = f"bold {line_color}"
         else:
-            grid_char[y][x] = "✖"
+            grid_char[y][x] = "X"
             grid_style[y][x] = "bold yellow"
 
     # 6. Annotate the latest point with its exact percentage value
@@ -204,14 +204,14 @@ def _render_component_plot(
 
     # 9. Compact legend & summary footer
     canvas.append("\n  ")
-    canvas.append("● Attended", style=f"bold {line_color}")
+    canvas.append("O Attended", style=f"bold {line_color}")
     canvas.append("   ")
-    canvas.append("✖ Skipped", style="bold yellow")
+    canvas.append("X Skipped", style="bold yellow")
     canvas.append("   ")
-    canvas.append(f"┄ Target {comp.threshold_pct:.0f}%", style=thresh_color)
+    canvas.append(f"-- Target {comp.threshold_pct:.0f}%", style=thresh_color)
     canvas.append(
-        f"   │   Now: {comp.current_attendance_pct:.1f}%  •  "
-        f"Hours: {comp.attended_hours:.1f}h/{comp.total_expected_hours:.0f}h  •  "
+        f"   |   Now: {comp.current_attendance_pct:.1f}%  -  "
+        f"Hours: {comp.attended_hours:.1f}h/{comp.total_expected_hours:.0f}h  -  "
         f"Max: {comp.max_possible_pct:.1f}%",
         style="bright_white",
     )

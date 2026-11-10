@@ -31,6 +31,7 @@ from attendpy.stats import (
     calculate_course_stats,
 )
 from attendpy.ui.chart import render_course_cartesian_chart
+from attendpy.ui.rich_compat import Confirm, FloatPrompt, Prompt
 
 
 class TestParser(unittest.TestCase):
@@ -53,6 +54,9 @@ class TestParser(unittest.TestCase):
         )
 
     def test_example_university_event_laboratory(self) -> None:
+        self.assertEqual(Prompt.prompt_suffix, " -> ")
+        self.assertEqual(Confirm.prompt_suffix, " -> ")
+        self.assertEqual(FloatPrompt.prompt_suffix, " -> ")
         title = "LINGUAGGI DI PROGRAMMAZIONE"
         desc = (
             "LINGUAGGI DI PROGRAMMAZIONE - LABORATORIO - Lab Informatica 1 - "

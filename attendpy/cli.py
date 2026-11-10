@@ -254,7 +254,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             for p in removed:
                 console.print(f"[dim]Removed: {p}[/]")
         console.print(
-            "[bold green]✔ Factory reset complete. All settings, courses, and lesson records have been wiped.[/]"
+            "[bold green]Factory reset complete. All settings, courses, and lesson records have been wiped.[/]"
         )
         return 0
 
@@ -296,7 +296,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ok_a, msg_a = provider.ensure_calendar_exists(config.attended_calendar)
         ok_s, msg_s = provider.ensure_calendar_exists(config.skipped_calendar)
         config.save()
-        console.print(f"[green]✔ Configuration updated.[/] ({msg_a} | {msg_s})")
+        console.print(f"[green]Configuration updated.[/] ({msg_a} | {msg_s})")
 
     if args.reconfigure:
         config = run_initial_setup_wizard(config)
@@ -379,7 +379,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         db.upsert_course(existing)
         console.print(
-            f"[bold green]✔ Course '{existing.name}' saved:[/] "
+            f"[bold green]Course '{existing.name}' saved:[/] "
             f"tracked={existing.tracked}, theory={existing.theory_total_hours:.1f}h "
             f"({existing.theory_threshold_pct:.0f}%), has_lab={existing.has_lab}"
             + (
@@ -399,7 +399,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 1
         c.show_in_dashboard = True
         db.upsert_course(c)
-        console.print(f"[bold green]✔ Course '{c.name}' is now SHOWN in Dashboard.[/]")
+        console.print(f"[bold green]Course '{c.name}' is now SHOWN in Dashboard.[/]")
         if not any([args.stats, args.chart, args.lessons, args.courses]):
             return 0
 
@@ -411,7 +411,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 1
         c.show_in_dashboard = False
         db.upsert_course(c)
-        console.print(f"[bold yellow]✔ Course '{c.name}' is now HIDDEN from Dashboard view.[/]")
+        console.print(f"[bold yellow]Course '{c.name}' is now HIDDEN from Dashboard view.[/]")
         if not any([args.stats, args.chart, args.lessons, args.courses]):
             return 0
 
@@ -424,18 +424,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sync_and_calculate(config, db, interactive_discovery=False, acknowledge_new=False)
         ok, msg = skip_lesson_by_id(db, config, args.skip_id)
         if not ok:
-            console.print(f"[bold red]✘ {msg}[/]")
+            console.print(f"[bold red][ERR] {msg}[/]")
             return 1
-        console.print(f"[bold green]✔ {msg}[/]")
+        console.print(f"[bold green]{msg}[/]")
         return 0
 
     if args.restore_id:
         sync_and_calculate(config, db, interactive_discovery=False, acknowledge_new=False)
         ok, msg = restore_lesson_by_id(db, config, args.restore_id)
         if not ok:
-            console.print(f"[bold red]✘ {msg}[/]")
+            console.print(f"[bold red][ERR] {msg}[/]")
             return 1
-        console.print(f"[bold green]✔ {msg}[/]")
+        console.print(f"[bold green]{msg}[/]")
         return 0
 
     if args.sync:
@@ -443,7 +443,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             config, db, interactive_discovery=False, acknowledge_new=False
         )
         console.print(
-            f"[bold green]✔ Synchronized {len(lessons)} lesson(s) across {len(all_stats)} tracked course(s).[/]"
+            f"[bold green]Synchronized {len(lessons)} lesson(s) across {len(all_stats)} tracked course(s).[/]"
         )
         return 0
 

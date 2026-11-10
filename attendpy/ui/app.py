@@ -11,17 +11,17 @@ from attendpy.models import CourseConfig, CourseStats, LessonEvent
 from attendpy.providers import get_provider
 from attendpy.stats import calculate_course_stats
 from attendpy.ui.dashboard import render_dashboard
-from attendpy.ui.lessons import (
-    interactive_skip_or_restore_prompt,
-    render_lessons_table,
+from attendpy.ui.interactive import (
+    interactive_courses_editor,
+    interactive_view_filter_selector,
 )
+from attendpy.ui.lessons import interactive_skip_or_restore_prompt
 from attendpy.ui.rich_compat import (
     Confirm,
-    FloatPrompt,
     Panel,
     Prompt,
-    Table,
     box,
+    clear_terminal_screen,
     console,
 )
 from attendpy.ui.wizard import (
@@ -180,7 +180,7 @@ def interactive_manage_courses(db: Database, config: AppConfig) -> None:
             )
 
     db.upsert_course(selected)
-    console.print(f"[bold green]✔ Updated course '{selected.name}'.[/]")
+    console.print(f"[bold green]Updated course '{selected.name}'.[/]")
 
 
 def interactive_configure_view(db: Database, config: AppConfig) -> None:
@@ -200,7 +200,7 @@ def interactive_configure_view(db: Database, config: AppConfig) -> None:
     table.add_column("Dashboard Visibility", justify="center")
 
     for idx, c in enumerate(courses, start=1):
-        vis = "[bold green]✔ Shown[/]" if c.show_in_dashboard else "[dim]✘ Hidden[/]"
+        vis = "[bold green]Shown[/]" if c.show_in_dashboard else "[dim]Hidden[/]"
         table.add_row(str(idx), c.name, vis)
 
     console.print(table)
@@ -222,7 +222,7 @@ def interactive_configure_view(db: Database, config: AppConfig) -> None:
         for c in courses:
             c.show_in_dashboard = True
             db.upsert_course(c)
-        console.print("[bold green]✔ All tracked courses are now shown in the Dashboard.[/]")
+        console.print("[bold green]All tracked courses are now shown in the Dashboard.[/]")
         return
 
     if raw == "none":
@@ -236,7 +236,7 @@ def interactive_configure_view(db: Database, config: AppConfig) -> None:
         config.show_charts = not config.show_charts
         config.save()
         st = "enabled" if config.show_charts else "disabled"
-        console.print(f"[bold green]✔ Cartesian charts {st} in Dashboard.[/]")
+        console.print(f"[bold green]Cartesian charts {st} in Dashboard.[/]")
         return
 
     tokens = [t.strip() for t in raw.replace(",", " ").split() if t.strip()]
@@ -255,7 +255,7 @@ def interactive_configure_view(db: Database, config: AppConfig) -> None:
             target.show_in_dashboard = not target.show_in_dashboard
             db.upsert_course(target)
             state_lbl = "SHOWN" if target.show_in_dashboard else "HIDDEN"
-            console.print(f"[bold green]✔ '{target.name}' is now {state_lbl} in Dashboard.[/]")
+            console.print(f"[bold green]'{target.name}' is now {state_lbl} in Dashboard.[/]")
         else:
             console.print(f"[red]Course '{tok}' not found.[/]")
 
@@ -272,6 +272,7 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
         acknowledge_new=True,
     )
 
+    clear_terminal_screen()
     render_dashboard(
         config=config,
         all_stats=all_stats,
@@ -307,10 +308,12 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                 .lower()
             )
         except (EOFError, KeyboardInterrupt):
-            console.print("\n[dim]Goodbye![/]")
+            clear_terminal_screen()
+            console.print("[dim]Goodbye![/]")
             return 0
 
         if action == "q":
+            clear_terminal_screen()
             console.print("[dim]Goodbye![/]")
             return 0
 
@@ -321,26 +324,44 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                 interactive_discovery=True,
                 acknowledge_new=True,
             )
+            clear_terminal_screen()
             render_dashboard(
                 config=config,
                 all_stats=all_stats,
                 newly_completed=newly_completed,
             )
         elif action == "v":
-            interactive_configure_view(db=db, config=config)
+            interactive_view_filter_selector(db=db, config=config)
+            all_stats, lessons, _ = sync_and_calculate(
+                config=config,
+                db=db,
+                interactive_discovery=False,
+                acknowledge_new=True,
+            )
+            clear_terminal_screen()
             render_dashboard(
                 config=config,
                 all_stats=all_stats,
                 newly_completed=newly_completed,
             )
         elif action == "l":
-            course_q = Prompt.ask(
-                "Filter by course name (press Enter for all courses)",
-                default="",
-            ).strip()
-            render_lessons_table(
-                lessons,
-                course_filter=course_q or None,
+            interactive_skip_or_restore_prompt(
+                db=db,
+                config=config,
+                lessons=lessons,
+                only_new=False,
+            )
+            all_stats, lessons, _ = sync_and_calculate(
+                config=config,
+                db=db,
+                interactive_discovery=False,
+                acknowledge_new=True,
+            )
+            clear_terminal_screen()
+            render_dashboard(
+                config=config,
+                all_stats=all_stats,
+                newly_completed=newly_completed,
             )
         elif action == "s":
             interactive_skip_or_restore_prompt(
@@ -355,8 +376,20 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                 interactive_discovery=False,
                 acknowledge_new=True,
             )
+            clear_terminal_screen()
+            render_dashboard(
+                config=config,
+                all_stats=all_stats,
+                newly_completed=newly_completed,
+            )
         elif action == "n":
             if not newly_completed:
+                clear_terminal_screen()
+                render_dashboard(
+                    config=config,
+                    all_stats=all_stats,
+                    newly_completed=newly_completed,
+                )
                 console.print(
                     "[green]No newly completed lessons from this session require review.[/]"
                 )
@@ -374,15 +407,28 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                     interactive_discovery=False,
                     acknowledge_new=True,
                 )
+                clear_terminal_screen()
+                render_dashboard(
+                    config=config,
+                    all_stats=all_stats,
+                    newly_completed=newly_completed,
+                )
         elif action == "c":
-            interactive_manage_courses(db=db, config=config)
+            interactive_courses_editor(db=db, config=config)
             all_stats, lessons, _ = sync_and_calculate(
                 config=config,
                 db=db,
                 interactive_discovery=False,
                 acknowledge_new=True,
             )
+            clear_terminal_screen()
+            render_dashboard(
+                config=config,
+                all_stats=all_stats,
+                newly_completed=newly_completed,
+            )
         elif action == "w":
+            clear_terminal_screen()
             config = run_initial_setup_wizard(config)
             all_stats, lessons, newly_completed = sync_and_calculate(
                 config=config,
@@ -390,11 +436,11 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                 interactive_discovery=True,
                 acknowledge_new=True,
             )
+            clear_terminal_screen()
             render_dashboard(
                 config=config,
                 all_stats=all_stats,
                 newly_completed=newly_completed,
-                show_charts=True,
             )
         elif action == "r":
             if Confirm.ask(
@@ -404,7 +450,8 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                 reset_all_data()
                 db = Database()
                 config = AppConfig()
-                console.print("[bold green]✔ All data wiped. Starting fresh setup wizard...[/]")
+                clear_terminal_screen()
+                console.print("[bold green]All data wiped. Starting fresh setup wizard...[/]")
                 config = run_initial_setup_wizard(config)
                 all_stats, lessons, newly_completed = sync_and_calculate(
                     config=config,
@@ -412,9 +459,16 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                     interactive_discovery=True,
                     acknowledge_new=True,
                 )
+                clear_terminal_screen()
                 render_dashboard(
                     config=config,
                     all_stats=all_stats,
                     newly_completed=newly_completed,
-                    show_charts=True,
+                )
+            else:
+                clear_terminal_screen()
+                render_dashboard(
+                    config=config,
+                    all_stats=all_stats,
+                    newly_completed=newly_completed,
                 )

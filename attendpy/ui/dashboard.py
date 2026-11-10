@@ -55,7 +55,7 @@ def render_newly_completed_banner(new_lessons: list[LessonEvent]) -> None:
     console.print(
         Panel(
             body,
-            title=f"[bold yellow]🔔 {len(new_lessons)} New Completed Lesson(s) (Auto-Attended)[/]",
+            title=f"[bold yellow]{len(new_lessons)} New Completed Lesson(s) (Auto-Attended)[/]",
             subtitle=r"[dim]Missed one? Press \[n] in menu or run 'attendpy --skip <ID>'[/]",
             border_style="yellow",
             box=box.ROUNDED,

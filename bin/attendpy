@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Launcher wrapper for attendpy."""
+
+import os
+import sys
+
+# Add repository root to Python path so attendpy package is always discoverable
+REPO_ROOT = "/Users/andrea/Desktop/github/attendpy"
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+from attendpy.cli import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,28 @@
+# Antigravity / Agent rules
+AGENTS.md
+GEMINI.md
+
+# Backup and tilde files
+~*
+*~
+
+# Environment files
+.env
+.env.*
+
+# Local attendpy runtime data
+.attendpy/
+
+# Python bytecode & packaging artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# macOS metadata
+.DS_Store
