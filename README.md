@@ -247,12 +247,14 @@ attendpy
 2. **Non-Blocking Newly Completed Lessons Banner:** If one or more lessons finished since your last visit, a yellow notification panel at the top lists them. You do **not** have to confirm them—they are already counted as attended. If you missed any of them, press `n` in the menu to move them to your Skipped Calendar.
 3. **Statistics Table & Cartesian Charts:** Displays the attendance table and a **Cartesian Attendance Chart** for each course showing your Theory curve (`●─●`), Lab curve (`◆═◆`), and horizontal threshold lines (`60%` and `80%`).
 4. **Interactive Menu:**
-   - `[d]` **Dashboard & Charts:** Refresh and display all tables and Cartesian plots.
-   - `[l]` **List Lessons:** Inspect individual lessons (with Short ID, date, time, hours, Theory/Lab badge, status, and room/code).
-   - `[s]` **Skip / Restore Lesson:** Enter one or more 8-character Lesson IDs to move a lesson to the Skipped Calendar (or restore it back to the Attended Calendar).
-   - `[n]` **Review New Lessons:** Quickly skip any newly completed lesson from the current session.
-   - `[c]` **Edit Courses:** Modify total hours, thresholds, Lab toggle, or tracking status for any course.
-   - `[w]` **Setup Wizard:** Re-run the step-by-step calendar provider and category configuration wizard.
+   - `[d]` **Dashboard:** Refresh and display all visible course tables and Cartesian plots.
+   - `[v]` **View Filter:** Choose which courses/exams are displayed or hidden in the Dashboard, and toggle Cartesian charts ON/OFF.
+   - `[l]` **Lessons:** Inspect individual lessons (with Short ID, date, time, hours, Theory/Lab badge, status, and room/code).
+   - `[s]` **Skip/Restore:** Enter one or more 8-character Lesson IDs to move a lesson to the Skipped Calendar (or restore it back to the Attended Calendar).
+   - `[n]` **New Lessons:** Quickly skip any newly completed lesson from the current session.
+   - `[c]` **Edit Courses:** Modify total hours, thresholds, Lab toggle, dashboard visibility, or tracking status for any course.
+   - `[w]` **Wizard:** Re-run the step-by-step calendar provider and category configuration wizard.
+   - `[r]` **Reset:** Factory reset all settings, courses, and lesson records.
    - `[q]` **Quit:** Exit `attendpy`.
 
 ---
@@ -327,6 +329,8 @@ Attendance & Course Modification Options:
       --lab-threshold=PCT        set Laboratory attendance threshold % (default: 80)
       --track                    enable tracking for the course (un-ignore)
       --ignore                   ignore the course in attendance calculations
+      --show-course=COURSE       show COURSE in the dashboard view
+      --hide-course=COURSE       hide COURSE from the dashboard view (still tracked)
 
 Miscellaneous Options:
   -h, --help                     display this help manual and exit

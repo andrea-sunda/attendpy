@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from attendpy.config import AppConfig
 from attendpy.models import ComponentStats, CourseStats, LessonEvent, LessonType
 from attendpy.ui.chart import render_course_cartesian_chart
@@ -32,34 +34,29 @@ def _format_status_badge(status: str) -> Text:
 
 
 def render_newly_completed_banner(new_lessons: list[LessonEvent]) -> None:
-    """Render a non-blocking notification panel for newly passed lessons."""
+    """Render a compact, non-blocking notification for newly completed lessons."""
     if not new_lessons:
         return
 
-    table = Table(box=box.SIMPLE, show_header=True, header_style="bold yellow")
-    table.add_column("ID", style="bold cyan", width=10)
-    table.add_column("Date & Time", style="bright_white", width=18)
-    table.add_column("Course", style="bold")
-    table.add_column("Type", width=11)
-    table.add_column("Hours", justify="right", width=7)
-    table.add_column("Location", style="dim")
-
-    for ev in new_lessons:
+    max_preview = 5
+    lines: list[str] = []
+    for ev in new_lessons[:max_preview]:
         t_style = "magenta" if ev.lesson_type == LessonType.LAB else "cyan"
-        table.add_row(
-            ev.short_id,
-            f"{ev.start_time.strftime('%Y-%m-%d %H:%M')}",
-            ev.course_name,
-            f"[{t_style}]{ev.lesson_type.label}[/]",
-            f"{ev.duration_hours:.1f}h",
-            ev.location or "-",
+        t_tag = "Lab" if ev.lesson_type == LessonType.LAB else "Theory"
+        lines.append(
+            f"[bold cyan]\\[{ev.short_id}][/] {ev.start_time.strftime('%d/%m %H:%M')} "
+            f"[bold]{ev.course_name}[/] ([{t_style}]{t_tag}[/], {ev.duration_hours:.0f}h)"
         )
+    if len(new_lessons) > max_preview:
+        extra = len(new_lessons) - max_preview
+        lines.append(f"[dim]... and {extra} more (press \\[n] to view all)[/]")
 
+    body = "\n".join(lines)
     console.print(
         Panel(
-            table,
-            title=f"[bold yellow]🔔 {len(new_lessons)} Newly Completed Lesson(s) Automatically Counted as Attended[/]",
-            subtitle=r"[dim]Optional: Did you miss any of these? Press \[n] in the menu or run 'attendpy --skip <ID>' to move to Skipped Calendar[/]",
+            body,
+            title=f"[bold yellow]🔔 {len(new_lessons)} New Completed Lesson(s) (Auto-Attended)[/]",
+            subtitle=r"[dim]Missed one? Press \[n] in menu or run 'attendpy --skip <ID>'[/]",
             border_style="yellow",
             box=box.ROUNDED,
         )
@@ -70,26 +67,43 @@ def render_dashboard(
     config: AppConfig,
     all_stats: list[CourseStats],
     newly_completed: list[LessonEvent],
-    show_charts: bool = True,
+    show_charts: Optional[bool] = None,
+    respect_visibility_filter: bool = True,
 ) -> None:
     """Render the full attendance dashboard, including tables and Cartesian charts."""
+    use_charts = config.show_charts if show_charts is None else show_charts
+    visible_stats = (
+        [cs for cs in all_stats if cs.course.show_in_dashboard]
+        if respect_visibility_filter
+        else all_stats
+    )
+    hidden_count = len(all_stats) - len(visible_stats)
+
     header = (
         f"[bold cyan]attendpy[/]  •  Provider: [bold]{config.provider.upper()}[/]  •  "
-        f"Attended Calendar: [bold green]{config.attended_calendar}[/]  •  "
-        f"Skipped Calendar: [bold yellow]{config.skipped_calendar}[/]"
+        f"Attended: [bold green]{config.attended_calendar}[/]  •  "
+        f"Skipped: [bold yellow]{config.skipped_calendar}[/]"
     )
     console.print(Panel(header, box=box.ROUNDED, border_style="cyan"))
 
-    # Non-blocking notification for newly completed lessons since last run
+    # Compact non-blocking notification for newly completed lessons since last run
     render_newly_completed_banner(newly_completed)
 
-    if not all_stats:
-        console.print(
-            Panel(
+    if not visible_stats:
+        msg = (
+            f"[yellow]All {hidden_count} tracked course(s) are currently hidden from the dashboard view.[/]\n"
+            r"Press [bold cyan]\[v][/] in the menu (or run [bold]attendpy --show-course <NAME>[/]) to enable them."
+            if hidden_count > 0
+            else (
                 "[yellow]No tracked courses found in your calendar yet.[/]\n"
                 f"Add lesson events to your [bold green]'{config.attended_calendar}'[/] calendar "
-                "and launch [bold]attendpy[/] again.",
-                title="[bold]No Courses Tracked[/]",
+                "and launch [bold]attendpy[/] again."
+            )
+        )
+        console.print(
+            Panel(
+                msg,
+                title="[bold]No Courses Displayed[/]",
                 border_style="yellow",
                 box=box.ROUNDED,
             )
@@ -143,13 +157,18 @@ def render_dashboard(
             _format_status_badge(comp.status_label),
         )
 
-    for cs in all_stats:
+    for cs in visible_stats:
         _add_comp_row(cs.course.name, cs.theory)
         if cs.course.has_lab and cs.lab is not None:
             _add_comp_row(f"[dim]↳ {cs.course.name}[/]", cs.lab)
 
     console.print(table)
 
-    if show_charts:
-        for cs in all_stats:
+    if hidden_count > 0:
+        console.print(
+            rf"[dim]  ℹ {hidden_count} tracked course(s) hidden from view — press \[v] in menu or use --show-course to display.[/]"
+        )
+
+    if use_charts:
+        for cs in visible_stats:
             console.print(render_course_cartesian_chart(cs))

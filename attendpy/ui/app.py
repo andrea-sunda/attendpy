@@ -107,6 +107,7 @@ def interactive_manage_courses(db: Database, config: AppConfig) -> None:
     table.add_column("#", justify="right", style="bold cyan", width=4)
     table.add_column("Course Name", style="bold bright_white")
     table.add_column("Tracked", justify="center")
+    table.add_column("In Dashboard", justify="center")
     table.add_column("Theory Hours", justify="right")
     table.add_column("Theory Threshold", justify="right")
     table.add_column("Has Lab", justify="center")
@@ -118,6 +119,7 @@ def interactive_manage_courses(db: Database, config: AppConfig) -> None:
             str(idx),
             c.name,
             "[green]Yes[/]" if c.tracked else "[red]Ignored[/]",
+            "[green]Shown[/]" if (c.tracked and c.show_in_dashboard) else "[dim]Hidden[/]",
             f"{c.theory_total_hours:.1f}h",
             f"{c.theory_threshold_pct:.0f}%",
             "[magenta]Yes[/]" if c.has_lab else "[dim]No[/]",
@@ -151,6 +153,10 @@ def interactive_manage_courses(db: Database, config: AppConfig) -> None:
     console.print(f"\n[bold cyan]Editing Course:[/] [bold]{selected.name}[/]")
     selected.tracked = Confirm.ask("  Track attendance for this course?", default=selected.tracked)
     if selected.tracked:
+        selected.show_in_dashboard = Confirm.ask(
+            "  Show this course in the Dashboard?",
+            default=selected.show_in_dashboard,
+        )
         selected.theory_total_hours = FloatPrompt.ask(
             "  Total expected Theory hours",
             default=selected.theory_total_hours,
@@ -177,6 +183,83 @@ def interactive_manage_courses(db: Database, config: AppConfig) -> None:
     console.print(f"[bold green]✔ Updated course '{selected.name}'.[/]")
 
 
+def interactive_configure_view(db: Database, config: AppConfig) -> None:
+    """Interactive menu to choose which courses and charts are displayed in the Dashboard."""
+    courses = db.list_courses(only_tracked=True)
+    if not courses:
+        console.print("[yellow]No tracked courses available to configure.[/]")
+        return
+
+    table = Table(
+        title="[bold bright_white]Dashboard View Settings (Visible Courses & Charts)[/]",
+        box=box.ROUNDED,
+        header_style="bold cyan",
+    )
+    table.add_column("#", justify="right", style="bold cyan", width=4)
+    table.add_column("Course Name", style="bold bright_white")
+    table.add_column("Dashboard Visibility", justify="center")
+
+    for idx, c in enumerate(courses, start=1):
+        vis = "[bold green]✔ Shown[/]" if c.show_in_dashboard else "[dim]✘ Hidden[/]"
+        table.add_row(str(idx), c.name, vis)
+
+    console.print(table)
+    charts_state = "[bold green]ON[/]" if config.show_charts else "[dim]OFF[/]"
+    console.print(
+        f"  Cartesian Charts in Dashboard: {charts_state}\n\n"
+        "[bold]Options:[/]\n"
+        "  • Enter course number(s) (e.g. [bold cyan]1 2[/]) to toggle visibility\n"
+        "  • Type [bold cyan]all[/] to show all courses, or [bold cyan]none[/] to hide all\n"
+        "  • Type [bold cyan]charts[/] to toggle Cartesian charts ON/OFF\n"
+        "  • Press [bold]Enter[/] to go back"
+    )
+
+    raw = Prompt.ask("[bold cyan]View option[/]", default="").strip().lower()
+    if not raw:
+        return
+
+    if raw == "all":
+        for c in courses:
+            c.show_in_dashboard = True
+            db.upsert_course(c)
+        console.print("[bold green]✔ All tracked courses are now shown in the Dashboard.[/]")
+        return
+
+    if raw == "none":
+        for c in courses:
+            c.show_in_dashboard = False
+            db.upsert_course(c)
+        console.print("[yellow]All courses hidden from Dashboard view.[/]")
+        return
+
+    if raw == "charts":
+        config.show_charts = not config.show_charts
+        config.save()
+        st = "enabled" if config.show_charts else "disabled"
+        console.print(f"[bold green]✔ Cartesian charts {st} in Dashboard.[/]")
+        return
+
+    tokens = [t.strip() for t in raw.replace(",", " ").split() if t.strip()]
+    for tok in tokens:
+        target: Optional[CourseConfig] = None
+        if tok.isdigit():
+            n = int(tok)
+            if 1 <= n <= len(courses):
+                target = courses[n - 1]
+        else:
+            for c in courses:
+                if tok.upper() in c.name.upper():
+                    target = c
+                    break
+        if target:
+            target.show_in_dashboard = not target.show_in_dashboard
+            db.upsert_course(target)
+            state_lbl = "SHOWN" if target.show_in_dashboard else "HIDDEN"
+            console.print(f"[bold green]✔ '{target.name}' is now {state_lbl} in Dashboard.[/]")
+        else:
+            console.print(f"[red]Course '{tok}' not found.[/]")
+
+
 def run_interactive_tui(config: AppConfig, db: Database) -> int:
     """Launch the interactive Rich TUI session."""
     if not config.initialized:
@@ -193,19 +276,19 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
         config=config,
         all_stats=all_stats,
         newly_completed=newly_completed,
-        show_charts=True,
     )
 
     while True:
         console.print()
         menu_panel = Panel(
-            r"[bold cyan]\[d][/] Dashboard & Charts   "
-            r"[bold cyan]\[l][/] List Lessons   "
-            r"[bold cyan]\[s][/] Skip / Restore Lesson   "
-            r"[bold cyan]\[n][/] Review New Lessons   "
+            r"[bold cyan]\[d][/] Dashboard   "
+            r"[bold cyan]\[v][/] View Filter   "
+            r"[bold cyan]\[l][/] Lessons   "
+            r"[bold cyan]\[s][/] Skip/Restore   "
+            r"[bold cyan]\[n][/] New Lessons   "
             r"[bold cyan]\[c][/] Edit Courses   "
-            r"[bold cyan]\[w][/] Setup Wizard   "
-            r"[bold red]\[r][/] Factory Reset   "
+            r"[bold cyan]\[w][/] Wizard   "
+            r"[bold red]\[r][/] Reset   "
             r"[bold cyan]\[q][/] Quit",
             title="[bold bright_white]attendpy Interactive Menu[/]",
             box=box.ROUNDED,
@@ -217,7 +300,7 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
             action = (
                 Prompt.ask(
                     "[bold cyan]Select action[/]",
-                    choices=["d", "l", "s", "n", "c", "w", "r", "q"],
+                    choices=["d", "v", "l", "s", "n", "c", "w", "r", "q"],
                     default="q",
                 )
                 .strip()
@@ -242,7 +325,13 @@ def run_interactive_tui(config: AppConfig, db: Database) -> int:
                 config=config,
                 all_stats=all_stats,
                 newly_completed=newly_completed,
-                show_charts=True,
+            )
+        elif action == "v":
+            interactive_configure_view(db=db, config=config)
+            render_dashboard(
+                config=config,
+                all_stats=all_stats,
+                newly_completed=newly_completed,
             )
         elif action == "l":
             course_q = Prompt.ask(

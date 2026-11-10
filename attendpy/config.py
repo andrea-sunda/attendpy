@@ -53,6 +53,7 @@ class AppConfig:
     default_lab_threshold: float = 80.0
     default_theory_hours: float = 48.0
     default_lab_hours: float = 24.0
+    show_charts: bool = True
     last_sync_at: str = ""
 
     @classmethod

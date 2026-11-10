@@ -199,14 +199,13 @@ def discover_and_prompt_new_courses(
         theory_evs = [e for e in course_events if e.lesson_type == LessonType.THEORY]
         lab_evs = [e for e in course_events if e.lesson_type == LessonType.LAB]
         detected_has_lab = len(lab_evs) > 0
-        sample_loc = next((e.location for e in course_events if e.location), "N/A")
-        sample_code = next((e.external_code for e in course_events if e.external_code), "N/A")
 
         if not can_prompt:
             # Non-interactive fallback: register course with sensible defaults
             auto_course = CourseConfig(
                 name=course_name,
                 tracked=True,
+                show_in_dashboard=True,
                 theory_total_hours=config.default_theory_hours,
                 theory_threshold_pct=config.default_theory_threshold,
                 has_lab=detected_has_lab,
@@ -217,28 +216,21 @@ def discover_and_prompt_new_courses(
             newly_configured.append(auto_course)
             continue
 
-        console.print()
+        # Compact single-line header for new course discovery
         console.print(
-            Panel(
-                f"[bold bright_white]{course_name}[/]\n\n"
-                f"  • Detected Theory events in calendar : [bold cyan]{len(theory_evs)}[/]\n"
-                f"  • Detected Lab events in calendar    : [bold magenta]{len(lab_evs)}[/]\n"
-                f"  • Sample Classroom / Location        : [dim]{sample_loc}[/]\n"
-                f"  • External Course Code               : [dim]{sample_code}[/]",
-                title="[bold yellow]New University Course Detected[/]",
-                border_style="yellow",
-                box=box.ROUNDED,
-            )
+            f"\n[bold yellow]✨ New course:[/] [bold bright_white]{course_name}[/] "
+            f"[dim]({len(theory_evs)} Theory, {len(lab_evs)} Lab in calendar)[/]"
         )
 
         track = Confirm.ask(
-            f"Do you want to track attendance for [bold]{course_name}[/]?",
+            "  Track attendance?",
             default=True,
         )
         if not track:
             ignored = CourseConfig(
                 name=course_name,
                 tracked=False,
+                show_in_dashboard=False,
                 theory_total_hours=config.default_theory_hours,
                 theory_threshold_pct=config.default_theory_threshold,
                 has_lab=detected_has_lab,
@@ -246,39 +238,38 @@ def discover_and_prompt_new_courses(
                 lab_threshold_pct=config.default_lab_threshold,
             )
             db.upsert_course(ignored)
-            console.print(
-                f"[dim]Course '{course_name}' marked as ignored (can be enabled later via --edit-course).[/]"
-            )
+            console.print(f"  [dim]↳ Ignored '{course_name}'.[/]")
             continue
 
         theory_hours = FloatPrompt.ask(
-            "  Expected total [bold cyan]Theory[/] hours for the entire semester",
+            "  Total [bold cyan]Theory[/] hours",
             default=config.default_theory_hours,
         )
         theory_threshold = FloatPrompt.ask(
-            "  Required [bold cyan]Theory[/] attendance threshold (%)",
+            "  [bold cyan]Theory[/] threshold %",
             default=config.default_theory_threshold,
         )
 
         has_lab = Confirm.ask(
-            "  Does this course include [bold magenta]Laboratory[/] sessions?",
+            "  Has [bold magenta]Lab[/]?",
             default=detected_has_lab,
         )
         lab_hours = 0.0
         lab_threshold = config.default_lab_threshold
         if has_lab:
             lab_hours = FloatPrompt.ask(
-                "  Expected total [bold magenta]Laboratory[/] hours for the entire semester",
+                "  Total [bold magenta]Lab[/] hours",
                 default=config.default_lab_hours,
             )
             lab_threshold = FloatPrompt.ask(
-                "  Required [bold magenta]Laboratory[/] attendance threshold (%)",
+                "  [bold magenta]Lab[/] threshold %",
                 default=config.default_lab_threshold,
             )
 
         new_course = CourseConfig(
             name=course_name,
             tracked=True,
+            show_in_dashboard=True,
             theory_total_hours=max(1.0, theory_hours),
             theory_threshold_pct=max(0.0, min(100.0, theory_threshold)),
             has_lab=has_lab,
@@ -287,6 +278,6 @@ def discover_and_prompt_new_courses(
         )
         db.upsert_course(new_course)
         newly_configured.append(new_course)
-        console.print(f"[bold green]✔ Saved configuration for '{course_name}'.[/]")
+        console.print(f"  [bold green]✔ Saved '{course_name}'.[/]")
 
     return newly_configured

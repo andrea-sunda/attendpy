@@ -76,6 +76,8 @@ Attendance & Course Modification Options:
       --lab-threshold=PCT        set Laboratory attendance threshold % (default: 80)
       --track                    enable tracking for the course (un-ignore)
       --ignore                   ignore the course in attendance calculations
+      --show-course=COURSE       show COURSE in the dashboard view
+      --hide-course=COURSE       hide COURSE from the dashboard view (still tracked)
 
 Miscellaneous Options:
   -h, --help                     display this help manual and exit
@@ -181,6 +183,8 @@ def build_parser() -> GNUArgumentParser:
     parser.add_argument("--lab-threshold", dest="lab_threshold", type=float, metavar="PCT")
     parser.add_argument("--track", dest="track_course", action="store_true", default=False)
     parser.add_argument("--ignore", dest="ignore_course", action="store_true", default=False)
+    parser.add_argument("--show-course", dest="show_course", metavar="COURSE")
+    parser.add_argument("--hide-course", dest="hide_course", metavar="COURSE")
 
     # Misc
     parser.add_argument("-h", "--help", action="store_true")
@@ -202,6 +206,7 @@ def _print_courses_table(db: Database) -> None:
     )
     table.add_column("Course Name", style="bold bright_white")
     table.add_column("Tracked", justify="center")
+    table.add_column("In Dashboard", justify="center")
     table.add_column("Theory Total Hours", justify="right")
     table.add_column("Theory Threshold", justify="right")
     table.add_column("Has Lab", justify="center")
@@ -212,6 +217,7 @@ def _print_courses_table(db: Database) -> None:
         table.add_row(
             c.name,
             "[green]Yes[/]" if c.tracked else "[red]Ignored[/]",
+            "[green]Shown[/]" if (c.tracked and c.show_in_dashboard) else "[dim]Hidden[/]",
             f"{c.theory_total_hours:.1f}h",
             f"{c.theory_threshold_pct:.0f}%",
             "[magenta]Yes[/]" if c.has_lab else "[dim]No[/]",
@@ -385,6 +391,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not any([args.stats, args.chart, args.lessons, args.courses]):
             return 0
 
+    if args.show_course:
+        cname = args.show_course.strip().upper()
+        c = db.get_course(cname)
+        if not c:
+            console.print(f"[red]Course '{cname}' not found.[/]")
+            return 1
+        c.show_in_dashboard = True
+        db.upsert_course(c)
+        console.print(f"[bold green]✔ Course '{c.name}' is now SHOWN in Dashboard.[/]")
+        if not any([args.stats, args.chart, args.lessons, args.courses]):
+            return 0
+
+    if args.hide_course:
+        cname = args.hide_course.strip().upper()
+        c = db.get_course(cname)
+        if not c:
+            console.print(f"[red]Course '{cname}' not found.[/]")
+            return 1
+        c.show_in_dashboard = False
+        db.upsert_course(c)
+        console.print(f"[bold yellow]✔ Course '{c.name}' is now HIDDEN from Dashboard view.[/]")
+        if not any([args.stats, args.chart, args.lessons, args.courses]):
+            return 0
+
     if args.courses:
         _print_courses_table(db)
         return 0
@@ -468,7 +498,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             config=config,
             all_stats=all_stats,
             newly_completed=newly,
-            show_charts=not args.no_chart,
+            show_charts=False if args.no_chart else None,
+            respect_visibility_filter=(c_filter is None),
         )
         return 0
 

@@ -60,6 +60,7 @@ class CourseConfig:
 
     name: str
     tracked: bool = True
+    show_in_dashboard: bool = True
     theory_total_hours: float = 48.0
     theory_threshold_pct: float = 60.0
     has_lab: bool = False

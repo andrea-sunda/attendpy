@@ -34,6 +34,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS courses (
                     name TEXT PRIMARY KEY,
                     tracked INTEGER NOT NULL DEFAULT 1,
+                    show_in_dashboard INTEGER NOT NULL DEFAULT 1,
                     theory_total_hours REAL NOT NULL DEFAULT 48.0,
                     theory_threshold_pct REAL NOT NULL DEFAULT 60.0,
                     has_lab INTEGER NOT NULL DEFAULT 0,
@@ -68,6 +69,15 @@ class Database:
                     ON seen_lessons(course_name);
                 """
             )
+            # Ensure backward-compatible migration if `show_in_dashboard` was added later
+            cols = {
+                r["name"]
+                for r in conn.execute("PRAGMA table_info(courses)").fetchall()
+            }
+            if "show_in_dashboard" not in cols:
+                conn.execute(
+                    "ALTER TABLE courses ADD COLUMN show_in_dashboard INTEGER NOT NULL DEFAULT 1"
+                )
 
     # ------------------------------------------------------------------
     # Course Operations
@@ -99,11 +109,12 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO courses (
-                    name, tracked, theory_total_hours, theory_threshold_pct,
+                    name, tracked, show_in_dashboard, theory_total_hours, theory_threshold_pct,
                     has_lab, lab_total_hours, lab_threshold_pct, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(name) DO UPDATE SET
                     tracked = excluded.tracked,
+                    show_in_dashboard = excluded.show_in_dashboard,
                     theory_total_hours = excluded.theory_total_hours,
                     theory_threshold_pct = excluded.theory_threshold_pct,
                     has_lab = excluded.has_lab,
@@ -113,6 +124,7 @@ class Database:
                 (
                     course.name.upper().strip(),
                     1 if course.tracked else 0,
+                    1 if course.show_in_dashboard else 0,
                     float(course.theory_total_hours),
                     float(course.theory_threshold_pct),
                     1 if course.has_lab else 0,
@@ -142,9 +154,12 @@ class Database:
 
     @staticmethod
     def _row_to_course(row: sqlite3.Row) -> CourseConfig:
+        keys = row.keys()
+        show_dash = bool(row["show_in_dashboard"]) if "show_in_dashboard" in keys else True
         return CourseConfig(
             name=row["name"],
             tracked=bool(row["tracked"]),
+            show_in_dashboard=show_dash,
             theory_total_hours=float(row["theory_total_hours"]),
             theory_threshold_pct=float(row["theory_threshold_pct"]),
             has_lab=bool(row["has_lab"]),

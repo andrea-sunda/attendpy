@@ -314,6 +314,19 @@ class TestTwoCalendarWorkflowAndCLI(unittest.TestCase):
         assert restored_row is not None
         self.assertEqual(restored_row["status_override"], "ATTENDED")
 
+        # 5b. Test --hide-course and --show-course dashboard visibility filter
+        rc_hide = main(["--hide-course", "LINGUAGGI DI PROGRAMMAZIONE"])
+        self.assertEqual(rc_hide, 0)
+        c_hidden = db.get_course("LINGUAGGI DI PROGRAMMAZIONE")
+        assert c_hidden is not None
+        self.assertFalse(c_hidden.show_in_dashboard)
+
+        rc_show = main(["--show-course", "LINGUAGGI DI PROGRAMMAZIONE"])
+        self.assertEqual(rc_show, 0)
+        c_shown = db.get_course("LINGUAGGI DI PROGRAMMAZIONE")
+        assert c_shown is not None
+        self.assertTrue(c_shown.show_in_dashboard)
+
         # 6. Check GNU usage() content
         help_text = usage()
         self.assertIn("Usage: attendpy [OPTION]...", help_text)
