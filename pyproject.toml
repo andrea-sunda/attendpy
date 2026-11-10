@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "attendpy"
+version = "1.0.0"
+description = "University course attendance tracker CLI/TUI for Apple Calendar and Google Calendar"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Andrea" }
+]
+keywords = ["attendance", "university", "calendar", "cli", "tui", "apple-calendar", "google-calendar"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+attendpy = "attendpy.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["attendpy*"]
